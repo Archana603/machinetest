@@ -145,55 +145,75 @@ router.get('/pending', authenticate, authorizeRoles('Manager', 'HR', 'manager', 
     });
   }
 });
-// approve timesheet
+// Approve timesheet
 router.post('/:id/approve', authenticate, authorizeRoles('manager', 'hr'), async (req, res) => {
   try {
-    const ts = await Timesheet.findById(req.params.id);
-    if(!ts) return res.status(404).json({ message: 'Timesheet not found' });
-    
+    const ts = await Timesheet.findById(req.params.id).populate('user');
+    if (!ts) {
+      return res.status(404).json({ success: false, message: 'Timesheet not found' });
+    }
+
     // If manager, verify the timesheet belongs to their team
     if (req.user.role === 'manager') {
       const employees = await User.find({ manager: req.user._id }).select('_id');
-      const employeeIds = employees.map(e => e._id);
-      if (!employeeIds.includes(ts.user.toString())) {
-        return res.status(403).json({ message: 'Not authorized to approve this timesheet' });
+      const employeeIds = employees.map(e => e._id.toString());
+      if (!employeeIds.includes(ts.user._id.toString())) {
+        return res.status(403).json({ success: false, message: 'Not authorized to approve this timesheet' });
       }
     }
-    
+
     ts.approved = true;
+    ts.status = "approved";
     ts.approver = req.user._id;
     await ts.save();
-    res.json(ts);
+
+    res.json({
+      success: true,
+      message: "Timesheet approved successfully",
+      timesheet: ts
+    });
   } catch (error) {
     console.error('Approve timesheet error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error while approving timesheet' });
   }
 });
 
-// reject timesheet
+
+// Reject timesheet
 router.post('/:id/reject', authenticate, authorizeRoles('manager', 'hr'), async (req, res) => {
   try {
-    const ts = await Timesheet.findById(req.params.id);
-    if(!ts) return res.status(404).json({ message: 'Timesheet not found' });
-    
+    const ts = await Timesheet.findById(req.params.id).populate('user');
+    if (!ts) {
+      return res.status(404).json({ success: false, message: 'Timesheet not found' });
+    }
+
     // If manager, verify the timesheet belongs to their team
     if (req.user.role === 'manager') {
       const employees = await User.find({ manager: req.user._id }).select('_id');
-      const employeeIds = employees.map(e => e._id);
-      if (!employeeIds.includes(ts.user.toString())) {
-        return res.status(403).json({ message: 'Not authorized to reject this timesheet' });
+      const employeeIds = employees.map(e => e._id.toString());
+      if (!employeeIds.includes(ts.user._id.toString())) {
+        return res.status(403).json({ success: false, message: 'Not authorized to reject this timesheet' });
       }
     }
-    
+
     ts.approved = false;
+    ts.status = "rejected";
     ts.approver = req.user._id;
     ts.notes = req.body.notes || 'Rejected by manager';
     await ts.save();
-    res.json(ts);
+
+    res.json({
+      success: true,
+      message: "Timesheet rejected successfully",
+      timesheet: ts
+    });
   } catch (error) {
     console.error('Reject timesheet error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error while rejecting timesheet' });
   }
 });
+
+
+
 
 module.exports = router;

@@ -9,6 +9,9 @@ const userRoutes = require('./routes/users');
 const timesheetRoutes = require('./routes/timesheets');
 const leaveRoutes = require('./routes/leaves');
 const payrollRoutes = require('./routes/payroll');
+const hrRoutes = require('./routes/hr');
+const reportsRoutes = require('./routes/reports');
+
 
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -24,6 +27,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/timesheets', timesheetRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/hr', hrRoutes);
+app.use('/api/reports',reportsRoutes);
 
 // error handler
 app.use(errorHandler);

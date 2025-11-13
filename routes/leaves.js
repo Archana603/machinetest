@@ -45,33 +45,57 @@ router.get('/me', authenticate, async (req, res) => {
 // manager/hr: view team leaves (pending)
 router.get('/pending', authenticate, authorizeRoles('manager', 'hr'), async (req, res) => {
   try {
-    // If HR, get all pending leaves
+    let pendingLeaves = [];
+
     if (req.user.role === 'hr') {
-      const pending = await Leave.find({ status: 'pending' })
+      // ✅ HR sees all pending leaves
+      pendingLeaves = await Leave.find({ status: 'pending' })
         .populate('user', 'name email role manager')
         .populate('approver', 'name email')
         .sort({ createdAt: -1 });
-      return res.json(pending);
+    } else if (req.user.role === 'manager') {
+      // ✅ Manager sees only their team’s pending leaves
+      const managerId = req.user._id;
+      const employees = await User.find({ manager: managerId }).select('_id');
+
+      if (employees.length === 0) {
+        return res.json({
+          success: true,
+          role: 'Manager',
+          count: 0,
+          leaves: [],
+          message: 'No team members found for this manager'
+        });
+      }
+
+      const employeeIds = employees.map(e => e._id);
+
+      pendingLeaves = await Leave.find({
+        user: { $in: employeeIds },
+        status: 'pending'
+      })
+        .populate('user', 'name email role')
+        .populate('approver', 'name email')
+        .sort({ createdAt: -1 });
     }
-    
-    // If manager, get leaves of their team only
-    const managerId = req.user._id;
-    const employees = await User.find({ manager: managerId }).select('_id name email');
-    const ids = employees.map(e => e._id);
-    const pending = await Leave.find({ 
-      user: { $in: ids }, 
-      status: 'pending' 
-    })
-    .populate('user', 'name email')
-    .populate('approver', 'name email')
-    .sort({ createdAt: -1 });
-    
-    res.json(pending);
+
+    // ✅ Respond with uniform structure
+    res.json({
+      success: true,
+      role: req.user.role === 'hr' ? 'HR' : 'Manager',
+      count: pendingLeaves.length,
+      leaves: pendingLeaves
+    });
+
   } catch (error) {
     console.error('Pending leaves error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching pending leaves'
+    });
   }
 });
+
 
 // get all leaves for manager/hr
 router.get('/all', authenticate, authorizeRoles('manager', 'hr'), async (req, res) => {
